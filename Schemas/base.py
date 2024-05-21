@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from Constants.enum import WorkStatus
-from Constants.vehicles import DELIVERY_DRIVERS
-from Utils import (
+from constants.enum import WorkStatus
+from constants.vehicles import DELIVERY_DRIVERS
+from utils import (
     generate_random_boolean,
     get_random_4_number,
     get_random_jeju_coordinates,
@@ -96,12 +96,12 @@ class Request(BaseModel):
         _works = [
             Work(
                 id=f"{get_random_4_number()}_{get_random_korean_string()}",
-                pickup=LocationTime(
+                pickup=WorkPoint(
                     location=get_random_jeju_coordinates(),
                     setup_time=_setup_time,
                     service_time=_service_time,
                 ),
-                delivery=LocationTime(
+                delivery=WorkPoint(
                     location=get_random_jeju_coordinates(),
                     setup_time=_setup_time,
                     service_time=_service_time,

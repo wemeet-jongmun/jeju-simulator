@@ -1,4 +1,4 @@
-from Schemas.base import Assembly, Request, Skills, Vehicle, Work
+from schemas.base import Assembly, Request, Skills, Vehicle, Work
 import shapely.geometry as geometry
 
 

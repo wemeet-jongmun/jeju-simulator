@@ -41,11 +41,12 @@ class CommonFields(BaseModel):
 
 
 class Steps(CommonFields, CustomAttribute):
-    id: int = Field()
     type: StepType = Field()
     arrival: int = Field()
+    setup: int = Field()
     location: Coordinate = Field()
     location_index: int = Field()
+    geometry: str = Field(default="")
 
 
 class Routes(CommonFields, CustomAttribute):
@@ -54,7 +55,7 @@ class Routes(CommonFields, CustomAttribute):
     cost: int = Field()
     setup: int = Field()
     priority: int = Field()
-    geometry: str = Field()
+    geometry: str | None = Field()
 
 
 class Unassigned(CustomAttribute):

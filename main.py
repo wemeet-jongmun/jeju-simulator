@@ -1,9 +1,7 @@
-from Schemas.base import Request as TestRequest
+from fastapi import FastAPI
+from app.router import router
+
+app = FastAPI(title="Jeju VRoouty Simulator", version="1.0.0")
 
 
-def jeju_onul(self):
-    request = TestRequest(work_cnt=10)
-
-
-if __name__ == "__main__":
-    jeju_onul()
+app.include_router(router=router)

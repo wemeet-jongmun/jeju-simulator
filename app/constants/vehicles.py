@@ -1,3 +1,4 @@
+RELAY_VEHICLE_TIME: int = 1800
 DELIVERY_DRIVERS: dict[str, dict[str, list[str]]] = {
     "기사 A": {"include": ["A-0"], "exclude": ["A-1", "A2B", "AD"]},
     "기사 B": {"include": ["B-0"], "exclude": ["B-1"]},

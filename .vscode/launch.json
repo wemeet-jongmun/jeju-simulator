@@ -1,11 +1,26 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
-            "console": "integratedTerminal",
-            "name": "Python:Video",
-            "program": "${workspaceFolder}/main.py",
-            "request": "launch",
-            "type": "python"
-        }
+          "name": "Python:FastAPI:EnvLocal",
+          "type": "python",
+          "request": "launch",
+          "module": "uvicorn",
+          "console": "integratedTerminal",
+          "cwd": "${workspaceFolder}",
+          "args": [
+            "main:app", 
+            "--reload", 
+            "--port=8100",
+          ],
+          "env": {
+            "VERSION": "unknown",
+            "VROOUTY_URL":"http://101.79.10.31:8000/distribute",
+            "OSRM_JEJU_URL":"http://101.79.10.31:5000",
+            "ATLAN_WRAPPER_URL":"http://101.79.10.31:6000"
+          }
+      },
     ]
 }
+
+

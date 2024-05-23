@@ -51,7 +51,7 @@ class Work(BaseModel):
     delivery: WorkPoint
     amount: list[int] | None = Field(default=None)
     status: Status | None = Field(default=Status)
-    excepotion: bool | None = Field(default=False)
+    exception: bool | None = Field(default=False)
     fix_vehicle_id: str | None = Field(default=None)
 
     @model_validator(mode="before")

@@ -41,6 +41,7 @@ class CommonFields(BaseModel):
 
 
 class Steps(CommonFields, CustomAttribute):
+    id: int | None = Field(default=None)
     type: StepType = Field()
     arrival: int = Field()
     setup: int = Field()

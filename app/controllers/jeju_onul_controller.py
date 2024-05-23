@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from datetime import timedelta
 from fastapi import HTTPException
@@ -8,6 +9,7 @@ from app.models.task import Task, VehicleTasks
 from app.models.vroouty import (
     Job,
     RequestParam,
+    Routes,
     Shipment,
     VRooutyResponse,
     VRooutyResponses,
@@ -72,27 +74,32 @@ class JejuOnulController:
             )
             work.delivery.service_time = timedelta(seconds=10)
 
+    # Waves
     async def process_wave1(self) -> VRooutyResponse:
         responses = {}
 
         # 배송 기사에 대한 주문건 Mapping 변수 초기화
-        vehicle_to_works: dict[str, list[Work]] = {}
+        vehicle_to_works: dict[str, list[Work]] = {
+            vehicle.id: [] for vehicle in self.request.vehicles
+        }
 
         # 권역에 대한 배송기사 Mapping 변수 초기화
-        group_to_vehicles: dict[str, str] = {}
-
-        # 배송 기사에 대한 주문건 + 권역에 대한 배송기사 Key Mapping 작업
-        for vehicle in self.request.vehicles:
-            vehicle_to_works[vehicle.id] = []
-            for group_id in vehicle.include:
-                group_to_vehicles[group_id] = vehicle.id
+        group_to_vehicles: dict[str, str] = {
+            group_id: vehicle.id
+            for vehicle in self.request.vehicles
+            for group_id in vehicle.include
+        }
 
         # 배송 기사의 권역에 따라 주문건 배정
         for work in self.request.works:
-            if work.excepotion:
+            if work.exception:
                 vehicle_to_works[work.fix_vehicle_id].append(work)
-            _vehicle_id = group_to_vehicles[work.pickup.group_id]
-            vehicle_to_works[_vehicle_id].append(work)
+            else:
+                _vehicle_id = group_to_vehicles[work.pickup.group_id]
+                vehicle_to_works[_vehicle_id].append(work)
+
+        # Async 처리 요청을 위한 리스트
+        tasks = []
 
         # VRoouty Call을 위한 Request 생성
         for vehicle in self.request.vehicles:
@@ -101,17 +108,18 @@ class JejuOnulController:
             _vehicles: list[Vehicle] = []
 
             # Job 데이터 생성
-            for work in vehicle_to_works[vehicle.id]:
-                # Waiting인 경우만 Job으로 추가
-                if work.status.type == TaskType.WAITING:
-                    _jobs.append(
-                        Job(
-                            id=self.id_handler.set("pickup", work.id),
-                            location=work.pickup.location,
-                            setup=work.pickup.get_setup_time,
-                            service=work.pickup.get_service_time,
-                        )
+            _jobs.extend(
+                [
+                    Job(
+                        id=self.id_handler.set("pickup", work.id),
+                        location=work.pickup.location,
+                        setup=work.pickup.get_setup_time,
+                        service=work.pickup.get_service_time,
                     )
+                    for work in vehicle_to_works[vehicle.id]
+                    if work.status.type == TaskType.WAITING
+                ]
+            )
 
             # Vehicle 데이터 생성
             _vehicles.append(
@@ -127,26 +135,30 @@ class JejuOnulController:
                 continue
 
             # VRoouty Call을 위한 Request Parameter 생성
-            vroouty_request_param: RequestParam = RequestParam(
+            vroouty_request_param = RequestParam(
                 jobs=_jobs,
                 shipments=_shipments,
                 vehicles=_vehicles,
                 distribute_options={"custom_matrix": {"enabled": True}},
             )
-            response = await VRooutyRequest(param=vroouty_request_param)
+            tasks.append((vehicle.id, VRooutyRequest(param=vroouty_request_param)))
 
-            if not response:
+        results = await asyncio.gather(*[task[1] for task in tasks])
+
+        # 요청 결과에 대한 처리
+        for vehicle_id, result in zip([task[0] for task in tasks], results):
+            if not result:
                 continue
 
+            # 각차량의 배차 결과가 30분 이내에 완료될 시 부권역과 Delivery 추가 후 재배차
             if RELAY_VEHICLE_TIME > next(
                 step.arrival
-                for route in response.routes
+                for route in result.routes
                 for step in route.steps
                 if step.type == StepType.END
             ):
                 _jobs.clear()
-
-                for work in vehicle_to_works[vehicle.id]:
+                for work in vehicle_to_works[vehicle_id]:
                     if work.status.type == WorkStatus.WAITING:
                         if work.pickup.group_id in vehicle.exclude:
                             _jobs.append(
@@ -162,18 +174,20 @@ class JejuOnulController:
                             and work.delivery.group_id in vehicle.include
                         ):
                             _shipments.append(
-                                pickup=Job(
-                                    id=self.id_handler.set("pickup", work.id),
-                                    location=work.pickup.location,
-                                    setup=work.pickup.get_setup_time,
-                                    service=work.pickup.get_service_time,
-                                ),
-                                delivery=Job(
-                                    id=self.id_handler.set("delivery", work.id),
-                                    location=work.delivery.location,
-                                    setup=work.delivery.get_setup_time,
-                                    service=work.delivery.get_service_time,
-                                ),
+                                Shipment(
+                                    pickup=Job(
+                                        id=self.id_handler.set("pickup", work.id),
+                                        location=work.pickup.location,
+                                        setup=work.pickup.get_setup_time,
+                                        service=work.pickup.get_service_time,
+                                    ),
+                                    delivery=Job(
+                                        id=self.id_handler.set("delivery", work.id),
+                                        location=work.delivery.location,
+                                        setup=work.delivery.get_setup_time,
+                                        service=work.delivery.get_service_time,
+                                    ),
+                                )
                             )
                             continue
                         _jobs.append(
@@ -196,29 +210,36 @@ class JejuOnulController:
                                 service=work.delivery.get_service_time,
                             )
                         )
-                    vroouty_request_param: RequestParam = RequestParam(
+                    vroouty_request_param = RequestParam(
                         jobs=_jobs,
                         shipments=_shipments,
                         vehicles=_vehicles,
                         distribute_options={"custom_matrix": {"enabled": True}},
                     )
-                    response = await VRooutyRequest(vroouty_request_param)
+                    response = await VRooutyRequest(param=vroouty_request_param)
 
                 if not response:
                     raise HTTPException(500)
 
-            responses[vehicle.id] = response
-        return VRooutyResponses(**responses)
+            responses[vehicle_id] = result
+        return VRooutyResponses(root=responses)
 
-    async def make_before_wave_response(self, responses: VRooutyResponse) -> dict:
+    # Response Processing
+    async def make_before_wave_response(
+        self, responses: VRooutyResponse
+    ) -> BeforeResponse:
         tasks: list[VehicleTasks] = []
         unassigned: list = []
 
-        for vehicle in self.request.vehicles:
+        vehicle_dict = {str(vehicle.id): vehicle for vehicle in self.request.vehicles}
+        assemblies_dict = {
+            tuple(assembly.location): assembly for assembly in self.request.assemblies
+        }
+
+        for vehicle_id, vehicle in vehicle_dict.items():
             _tasks: list[Task] = []
 
-            if str(vehicle.id) in responses.root:
-                response = responses.root[str(vehicle.id)]
+            response: Routes = responses.root.get(vehicle_id, None)
 
             if response:
                 for route in response.routes:
@@ -228,8 +249,10 @@ class JejuOnulController:
                             TaskType.PICKUP,
                             TaskType.DELIVERY,
                         ]:
-                            _type, work_id = self.id_handler.get_from_id(step.id)
-                            if step.type in [
+                            _type, work_id = self.id_handler.get_from_index(
+                                index=step.id
+                            )
+                            if _type in [
                                 TaskType.PICKUP,
                                 TaskType.SHIPMENT_PICKUP,
                                 TaskType.DELIVERY,
@@ -237,31 +260,33 @@ class JejuOnulController:
                             ]:
                                 _tasks.append(
                                     Task(
-                                        work_id=None,
-                                        type=step.type,
+                                        work_id=work_id,
+                                        type=TaskType(_type),
                                         eta=step.arrival,
                                         duration=step.duration,
-                                        setup_time=step.setup_time,
-                                        serice_time=step.service_time,
+                                        distance=step.distance,
+                                        setup_time=step.setup,
+                                        serice_time=step.service,
                                         assembly_id=None,
                                         location=step.location,
                                     )
                                 )
                         elif step.type == TaskType.END:
-                            for assembly in self.request.assemblies:
-                                if assembly.location == step.location:
-                                    _tasks.append(
-                                        Task(
-                                            work_id=None,
-                                            type=TaskType.ARRIVAL,
-                                            eta=step.arrival,
-                                            duration=step.duration,
-                                            setup_time=step.setup_time,
-                                            serice_time=step.service_time,
-                                            assembly_id=None,
-                                            location=step.location,
-                                        )
+                            if assembly := assemblies_dict.get(
+                                tuple(step.location), None
+                            ):
+                                _tasks.append(
+                                    Task(
+                                        work_id=None,
+                                        type=TaskType.ARRIVAL,
+                                        eta=step.arrival,
+                                        duration=step.duration,
+                                        setup_time=step.setup,
+                                        serice_time=step.service,
+                                        assembly_id=None,
+                                        location=step.location,
                                     )
+                                )
             tasks.append(
                 VehicleTasks(
                     vehicle_id=vehicle.id,

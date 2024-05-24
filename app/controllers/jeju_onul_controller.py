@@ -376,6 +376,7 @@ class JejuOnulController:
                 id=self.id_handler.set("vehicle", vehicle.id),
                 profile=vehicle.profile,
                 start=vehicle_start_location(vehicle),
+                end=next(iter(self.request.assemblies)).location,
             )
             for vehicle in self.request.vehicles
         ]

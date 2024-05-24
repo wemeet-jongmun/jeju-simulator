@@ -17,22 +17,30 @@ class IdHandler:
     """
 
     _unique_id: int = 0
-    _id_to_index: dict[tuple[str, str], int] = {}
-    _index_to_id: dict[int, tuple[str, str]] = {}
+    _index_to_id: dict[tuple[str, str], int] = {}
+    _id_to_index: dict[int, tuple[str, str]] = {}
 
-    def get_from_id(self, id: int) -> dict:
-        return self._id_to_index[id]
-
-    def get_from_index(self, index: dict) -> int:
+    def get_id(self, index: dict) -> int:
+        """
+        return id to use index
+        index : (status, works_id)
+        """
         return self._index_to_id[index]
+
+    def get_index(self, id: int) -> dict:
+        """
+        return index to use id
+        index : (status, works_id)
+        """
+        return self._id_to_index[id]
 
     def set(self, role: ROLE, id: str) -> int:
         """
         ROLE : "pickup", "delivery", "shipment_pickup", "shipment_delivery", "shipment_assembly", "vehicle",
         """
         key = (role, id)
-        if key not in self._id_to_index:
-            self._id_to_index[key] = self._unique_id
-            self._index_to_id[self._unique_id] = key
+        if key not in self._index_to_id:
+            self._id_to_index[self._unique_id] = key
+            self._index_to_id[key] = self._unique_id
             self._unique_id += 1
-        return self._id_to_index[key]
+        return self._index_to_id[key]

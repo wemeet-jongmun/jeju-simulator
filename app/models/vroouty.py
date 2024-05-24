@@ -11,6 +11,7 @@ class Job(BaseModel):
     location: Coordinate = Field()
     setup: int = Field()
     service: int = Field()
+    priority: int | None = Field(default=None)
 
 
 class Shipment(BaseModel):
@@ -22,12 +23,13 @@ class Vehicle(BaseModel):
     id: int | None = Field(default=0)
     profile: str | None = Field(default=None)
     start: Coordinate = Field()
+    end: Coordinate | None = Field(default=None)
 
 
 class RequestParam(BaseModel):
     jobs: list[Job] = Field()
-    shipments: list[Shipment] = Field()
-    vehicles: list[Vehicle] = Field()
+    shipments: list[Shipment] | None = Field(default_factory=list)
+    vehicles: list[Vehicle] | None = Field(default_factory=list)
     distribute_options: dict = Field()
 
 

@@ -26,8 +26,8 @@ class VehicleTasks(BaseModel):
 
 
 class VehicleSwaps(BaseModel):
-    vehicle_id: str
-    assembly_id: str
-    stopover_time: NonNegativeInt
-    down: list[str]
-    up: list[str]
+    vehicle_id: str = Field()
+    assembly_id: str = Field()
+    stop_over_time: NonNegativeInt = Field()
+    up: list[str] | None = Field(default_factory=list)
+    down: list[str] | None = Field(default_factory=list)

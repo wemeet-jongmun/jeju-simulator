@@ -28,6 +28,6 @@ class VehicleTasks(BaseModel):
 class VehicleSwaps(BaseModel):
     vehicle_id: str = Field()
     assembly_id: str = Field()
-    stop_over_time: NonNegativeInt = Field()
+    stop_over_time: NonNegativeInt = Field(serialization_alias="stopover_time")
     up: list[str] | None = Field(default_factory=list)
     down: list[str] | None = Field(default_factory=list)

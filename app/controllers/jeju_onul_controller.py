@@ -1,6 +1,7 @@
 import asyncio
 from collections import defaultdict
 from datetime import timedelta
+from typing import Literal
 from fastapi import HTTPException
 from shapely.geometry import Polygon
 from app.constants.vehicles import RELAY_VEHICLE_TIME
@@ -356,30 +357,42 @@ class JejuOnulController:
         self,
         job_status_condition: callable,
         vehicle_start_location: callable,
-        prefix: str,
+        prefix: Literal["pickup", "delivery"],
     ) -> VRooutyResponse:
         # Job 데이터 생성
         _jobs = [
             Job(
                 id=self.id_handler.set(prefix, work.id),
-                location=work.pickup.location,
-                setup=work.pickup.get_setup_time,
-                service=work.pickup.get_service_time,
+                location=getattr(work, prefix).location,
+                setup=getattr(work, prefix).get_setup_time,
+                service=getattr(work, prefix).get_service_time,
             )
             for work in self.request.works
             if job_status_condition(work.status.type)
         ]
 
         # Vehicle 데이터 생성
-        _vehicles = [
-            Vehicle(
-                id=self.id_handler.set("vehicle", vehicle.id),
-                profile=vehicle.profile,
-                start=vehicle_start_location(vehicle),
-                end=next(iter(self.request.assemblies)).location,
-            )
-            for vehicle in self.request.vehicles
-        ]
+        if prefix == "pickup":
+            _vehicles = [
+                Vehicle(
+                    id=self.id_handler.set("vehicle", vehicle.id),
+                    profile=vehicle.profile,
+                    start=vehicle_start_location(vehicle),
+                    end=next(iter(self.request.assemblies)).location,
+                )
+                for vehicle in self.request.vehicles
+            ]
+        elif prefix == "delivery":
+            _vehicles = [
+                Vehicle(
+                    id=self.id_handler.set("vehicle", vehicle.id),
+                    profile=vehicle.profile,
+                    start=next(iter(self.request.assemblies)).location,
+                )
+                for vehicle in self.request.vehicles
+            ]
+        else:
+            _vehicles = []
 
         # VRoouty 요청 파라미터 생성
         vroouty_request_param = RequestParam(

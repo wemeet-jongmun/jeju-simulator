@@ -11,7 +11,7 @@
           "args": [
             "main:app", 
             "--reload", 
-            "--port=8100",
+            "--port=12000",
           ],
           "env": {
             "VERSION": "unknown",

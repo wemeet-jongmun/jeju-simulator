@@ -15,9 +15,24 @@
           ],
           "env": {
             "VERSION": "unknown",
-            "VROOUTY_URL":"http://101.79.10.31:8000/distribute",
-            "OSRM_JEJU_URL":"http://101.79.10.31:5000",
-            "ATLAN_WRAPPER_URL":"http://101.79.10.31:6000"
+            "VROOUTY_URL":"http://101.79.10.31:8000/distribute"
+          }
+      },
+      {
+          "name": "Python:FullLocal",
+          "type": "python",
+          "request": "launch",
+          "module": "uvicorn",
+          "console": "integratedTerminal",
+          "cwd": "${workspaceFolder}",
+          "args": [
+            "main:app", 
+            "--reload", 
+            "--port=12000",
+          ],
+          "env": {
+            "VERSION": "unknown",
+            "VROOUTY_URL":"http://localhost:8000/distribute"
           }
       },
     ]
